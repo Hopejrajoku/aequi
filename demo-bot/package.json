@@ -1,0 +1,20 @@
+{
+  "name": "demo-bot",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "@mysten/sui": "^2.6.0",
+    "@mysten/zklogin": "^0.8.1",
+    "dotenv": "^17.3.1"
+  }
+}

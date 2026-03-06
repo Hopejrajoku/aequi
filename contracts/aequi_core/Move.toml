@@ -1,0 +1,9 @@
+[package]
+name = "aequi_core"
+edition = "2024.alpha"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }
+
+[addresses]
+aequi = "0x0"
