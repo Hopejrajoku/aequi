@@ -11,8 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@mysten/sui": "^2.1.0",
-    "@mysten/zklogin": "^0.8.1",
+    "@mysten/sui": "^2.6.0",
     "@types/node": "^25.3.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

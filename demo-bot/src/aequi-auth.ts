@@ -34,3 +34,6 @@ export async function startLogin() {
 export function getAequiAddress(idToken: string) {
     return jwtToAddress(idToken, SALT, false);
 }
+
+// Best Practice: The backend Prover (Shinami) should be the one returning the seed
+// to ensure it matches the proof. We will update main.ts to prioritize that.
