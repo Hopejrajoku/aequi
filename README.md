@@ -1,9 +1,9 @@
-# Ìºä Aequi: Money as a Message
+#  Aequi: Money as a Message
 ### *The Next-Gen On-Chain Payment Infrastructure on Sui*
 
 **Aequi** is a high-performance, developer-first SDK and payment protocol built on the Sui Network. It abstracts the complexity of programmable transactions into a human-readable "Message" format, allowing for seamless value transfer coupled with intent.
 
-## Ì≥ñ Table of Contents
+##  Table of Contents
 * [Vision](#-vision)
 * [Project Structure](#-project-structure)
 * [Core Features](#-core-features)
@@ -13,10 +13,10 @@
 * [Roadmap](#-roadmap)
 * [Contributing](#-contributing)
 
-## ÌæØ Vision
+##  Vision
 **Aequi** (Latin for *Equal/Fair*) aims to bridge the gap between traditional messaging and financial settlement. By leveraging Sui's object-centric model, we treat every payment as a unique data object that carries metadata, ensuring that **"The Message is the Money."**
 
-## Ìøó Project Structure
+##  Project Structure
 This repository is organized as a monorepo to separate concerns between the core engine and implementation bots.
 
 ```text
@@ -31,13 +31,13 @@ aequi/
 ‚îî‚îÄ‚îÄ Move/             # Smart Contract Source (Sui Move)
 ```
 
-## Ì∫Ä Core Features
+## Core Features
 * **Atomic Move Calls:** Single-click execution of the `send_message_payment` function.
 * **Node v24 Optimized:** Fully compatible with the latest ESM loaders using dynamic import strategies.
 * **Typed Configurations:** Centralized management of Package IDs and RPC endpoints.
 * **Stateless Transaction Building:** Build transactions locally and sign/execute them only when ready.
 
-## Ì≤ª Technical Setup
+## Technical Setup
 ### Prerequisites
 * **Node.js:** v24.12.0 or higher (LTS recommended)
 * **Sui CLI:** For contract management and keypair exports.
@@ -59,7 +59,7 @@ The SDK requires a `.env` file in the `sdk/` directory:
 SUI_PRIVATE_KEY=your_base64_or_hex_key
 ```
 
-## Ìª† SDK Usage
+## SDK Usage
 Aequi uses a **Dynamic Discovery Pattern** to ensure compatibility with modern JavaScript runtimes (ESM).
 
 ### Initializing a Transaction
@@ -72,7 +72,7 @@ const tx = await createMessagePaymentTx(
 );
 ```
 
-## Ì¥ß Troubleshooting (Node v24 Issues)
+##  Troubleshooting (Node v24 Issues)
 If you encounter `TypeError: SuiClient is not a constructor`, the Aequi SDK handles this by using **Explicit Namespace Extraction**:
 
 ```typescript
@@ -82,15 +82,15 @@ const SuiClient = clientModule.SuiClient;
 ```
 This bypasses the ESM/CommonJS interop bugs present in the latest Node loaders.
 
-## Ì∑∫ Roadmap
+## Roadmap
 - [x] **Phase 1:** Core Move Contract (Payment Module).
 - [x] **Phase 2:** TypeScript SDK Hardening (Node v24 Support).
 - [ ] **Phase 3:** Next.js Merchant Dashboard.
 - [ ] **Phase 4:** Mainnet Alpha Launch.
 
-## Ì¥ù Contributing
+## Contributing
 1. **Branch** from `main`.
 2. Ensure `npm test` passes in the `sdk/` directory.
 3. **Submit a PR** with a detailed description of the changes.
 
-**Built with Ì≤ô for the Sui Ecosystem.**
+**Built with for the Sui Ecosystem.**
