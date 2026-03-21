@@ -8,6 +8,10 @@ import { AequiClient } from './aequi-client';
 
 declare var confetti: any;
 
+/**
+ * CONFIGURATION
+ * Points to Shinami (Primary) and Public (Fallback)
+ */
 const aequi = new AequiClient({
     shinamiNodeUrl: 'https://api.us1.shinami.com/sui/node/v1?apikey=us1_sui_testnet_9823727156a6473fba7e59afdc5246b9',
     fallbackNodeUrl: 'https://fullnode.testnet.sui.io:443',
@@ -17,12 +21,19 @@ const aequi = new AequiClient({
 const SALT = "1234567890123456"; 
 const AEQUI_PACKAGE_ID = "0x987ce1380aece8aee903af49a11dcff9f075837afcb98a82687e9d387e3fcaab";
 
+/**
+ * HELPER: Compute ZK Address Seed for signature verification
+ */
 function computeAddressSeed(idToken: string, salt: string): string {
     const parts = idToken.split('.');
     const payload = JSON.parse(atob(parts[1]));
     return genAddressSeed(BigInt(salt), "sub", payload.sub, payload.aud).toString();
 }
 
+/**
+ * UI: Refresh the Live Support Ledger
+ * Uses the fallback client for indexing to avoid rate limits/401s
+ */
 async function refreshSupportLedger() {
     const ledgerDiv = document.getElementById('ledger-content');
     if (!ledgerDiv) return;
@@ -45,27 +56,32 @@ async function refreshSupportLedger() {
             const sender = e.sender || "0x...";
             const shortSender = `${sender.slice(0, 6)}...${sender.slice(-4)}`;
             
+            // message_ref comes from your Move contract event
             const rawRef = data.message_ref || "Support Received";
             
-            // Smart Render: If it's a Walrus ID (no spaces, ~44 chars), link it. 
-            // Otherwise, show as text.
+            // Smart Render: Check if it's a Walrus Blob ID (long, no spaces) or raw text
             const isWalrus = rawRef.length > 40 && !rawRef.includes(" ");
             const displayMessage = isWalrus 
-                ? `<a href="https://walrus-testnet.walrus.site/v1/get/${rawRef}" target="_blank" style="color:#007bff; text-decoration:none;">View on Walrus ↗</a>`
-                : `<span style="color:#333; font-style:italic;">"${rawRef}"</span>`;
+                ? `<a href="https://walrus-testnet.walrus.site/v1/get/${rawRef}" target="_blank" style="color:#007bff; text-decoration:none; font-weight:600;">View on Walrus ↗</a>`
+                : `<span style="color:#333; font-weight:600;">"${rawRef}"</span>`;
             
             html += `
-                <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f5f5f5; font-size:12px;">
-                    <span style="font-family:monospace; color:#555;">${shortSender}</span>
-                    <span style="font-weight:600;">${displayMessage}</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f5f5f5; font-size:12px;">
+                    <span style="font-family:monospace; color:#666; background:#f9f9f9; padding:2px 4px; border-radius:4px;">${shortSender}</span>
+                    <span>${displayMessage}</span>
                 </div>`;
         });
         ledgerDiv.innerHTML = html + '</div>';
     } catch (err) {
+        console.error("Ledger Sync Error:", err);
         ledgerDiv.innerHTML = '<p style="color:#999; font-size:10px;">Indexer syncing...</p>';
     }
 }
 
+/**
+ * CORE: Transaction Handler
+ * Manages Walrus storage, Keypair hydration, Sponsorship, and ZK-Execution
+ */
 async function handleSponsoredTransaction(userAddress: string, message: string, idToken: string) {
     const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
     const btnText = document.getElementById('btn-text') as HTMLElement;
@@ -74,12 +90,14 @@ async function handleSponsoredTransaction(userAddress: string, message: string, 
     try {
         sendBtn.disabled = true;
         btnText.innerHTML = '<div class="spinner"></div>';
+        receiptArea.innerHTML = ""; // Clear previous errors
         
-        // Tries Walrus first, falls back to raw message if DNS/Node fails
-        const blobId = await aequi.storeOnWalrus(message);
+        // 1. Storage: Try Walrus, fall back to raw message on DNS/Node fail
+        const messageRef = await aequi.storeOnWalrus(message);
 
+        // 2. Auth: Hydrate Ephemeral Keypair
         const ephemeralPvt = localStorage.getItem('aequi_ephemeral_pvt');
-        if (!ephemeralPvt) throw new Error("Session expired.");
+        if (!ephemeralPvt) throw new Error("Session expired. Please log in again.");
 
         let ephemeralKeypair: Ed25519Keypair;
         if (ephemeralPvt.startsWith('suiprivkey')) {
@@ -89,18 +107,23 @@ async function handleSponsoredTransaction(userAddress: string, message: string, 
             ephemeralKeypair = Ed25519Keypair.fromSecretKey(Uint8Array.from(JSON.parse(ephemeralPvt)));
         }
 
+        // 3. Construct Transaction
         const tx = new Transaction();
         tx.setSender(userAddress);
+        
+        // Split 0.01 SUI for the support payment
         const [coin] = tx.splitCoins(tx.gas, [10_000_000]); 
         
         tx.moveCall({
             target: `${AEQUI_PACKAGE_ID}::payment::send_message_payment`,
-            arguments: [coin, tx.pure.address(userAddress), tx.pure.string(blobId)],
+            arguments: [coin, tx.pure.address(userAddress), tx.pure.string(messageRef)],
         });
 
         tx.setGasBudget(30_000_000); 
+        // Sponsor address (must match your local gas station config)
         tx.setGasOwner("0x7bb58bb4bb9fcbc26b6766c8a767acdbb68dd48f793adbf0b9f960233906ef74");
 
+        // 4. Execute via Aequi SDK (handles Prover and Sponsorship)
         const result = await aequi.executeGasless({
             tx,
             idToken: idToken.trim(),
@@ -111,24 +134,30 @@ async function handleSponsoredTransaction(userAddress: string, message: string, 
             addressSeed: computeAddressSeed(idToken, SALT)
         });
 
+        // 5. Success Feedback
         if (typeof confetti !== 'undefined') confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
         btnText.innerHTML = "Success!";
-        receiptArea.innerHTML = `<a href="https://testnet.suivision.xyz/txblock/${result.digest}" target="_blank" style="color:#007bff; font-size:11px;">View Receipt ↗</a>`;
+        receiptArea.innerHTML = `<a href="https://testnet.suivision.xyz/txblock/${result.digest}" target="_blank" style="color:#007bff; font-size:11px; text-decoration:none; font-weight:bold;">View Receipt ↗</a>`;
         
-        setTimeout(refreshSupportLedger, 3000);
+        // Refresh the ledger after a short delay for indexer catch-up
+        setTimeout(refreshSupportLedger, 3500);
     } catch (error: any) {
+        console.error("Transaction Error:", error);
         btnText.innerHTML = "Try Again";
-        receiptArea.innerHTML = `<div style="color:red; font-size:11px;">❌ ${error.message}</div>`;
+        receiptArea.innerHTML = `<div style="color:#ff4d4d; font-size:11px; margin-top:10px;">❌ ${error.message}</div>`;
     } finally {
         sendBtn.disabled = false;
     }
 }
 
+/**
+ * INITIALIZATION
+ */
 document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
     const statusDiv = document.getElementById('status');
     
-    // Check for token
+    // Check for OAuth fragment
     const urlParams = new URLSearchParams(window.location.hash.slice(1));
     const idToken = urlParams.get('id_token');
 
@@ -142,36 +171,45 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="profile-pic">H</div>
                     <div class="creator-name">Hope-Jr Ajoku</div>
                     <div class="creator-bio">Building the future of "Money as a Message"</div>
+                    
                     <div class="input-group">
                         <span class="input-label">Support Message</span>
-                        <input type="text" id="msg-input" class="aequi-input" value="Aequi: Money as a Message">
+                        <input type="text" id="msg-input" class="aequi-input" placeholder="Type a message..." value="Aequi: Money as a Message">
                     </div>
+                    
                     <button id="send-btn" class="btn-send">
-                        <span id="btn-text">Support with $1</span>
+                        <span id="btn-text">Support with 0.01 SUI</span>
                     </button>
-                    <div id="receipt-area"></div>
-                    <div id="support-ledger" style="margin-top:25px; text-align:left; border-top:1px solid #eee; padding-top:15px;">
-                        <h4 style="margin:0; font-size:12px; color:#333; text-transform:uppercase; font-weight:700;">Recent Support</h4>
-                        <div id="ledger-content">Loading feed...</div>
+                    
+                    <div id="receipt-area" style="margin-top:10px; text-align:center;"></div>
+                    
+                    <div id="support-ledger" style="margin-top:30px; text-align:left; border-top:2px solid #f0f0f0; padding-top:20px;">
+                        <h4 style="margin:0 0 10px 0; font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1.5px; font-weight:800;">Recent Support</h4>
+                        <div id="ledger-content">Loading live feed...</div>
                     </div>
                 </div>
             `;
 
             refreshSupportLedger();
 
-            document.getElementById('send-btn').onclick = () => {
-                const msg = (document.getElementById('msg-input') as HTMLInputElement).value;
-                handleSponsoredTransaction(userAddress, msg, idToken);
-            };
+            // Setup send button listener
+            const sendBtn = document.getElementById('send-btn');
+            if (sendBtn) {
+                sendBtn.onclick = () => {
+                    const msg = (document.getElementById('msg-input') as HTMLInputElement).value;
+                    handleSponsoredTransaction(userAddress, msg, idToken);
+                };
+            }
         } catch (e) {
-            console.error("Auth flow failed", e);
+            console.error("Critical Auth/UI Failure:", e);
         }
     }
 
-    // Always ensure login button works
+    // Ensure the landing page login button is always active
     if (loginBtn) {
         loginBtn.onclick = (e) => {
             e.preventDefault();
+            console.log("Aequi: Initiating ZK-Auth...");
             startLogin();
         };
     }
