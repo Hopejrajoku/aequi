@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { Transaction } from '@mysten/sui/transactions';
-import { SuiJsonRpcClient } from '@mysten/sui/jsonRpc'; // Reverted for compatibility
+import { SuiJsonRpcClient } from '@mysten/sui/jsonRpc';
 import { getZkLoginSignature } from '@mysten/sui/zklogin';
 
 export class AequiClient {
@@ -13,14 +13,15 @@ export class AequiClient {
         this.client = new SuiJsonRpcClient({ url: config.shinamiNodeUrl });
         this.fallbackClient = new SuiJsonRpcClient({ url: config.fallbackNodeUrl });
         this.gasStationUrl = config.gasStationUrl;
-        // Using Devnet as the default fallback
-        this.walrusUrl = config.walrusPublisherUrl || "https://publisher.walrus-devnet.walrus.site/v1/store";
+        
+        // Testnet publisher endpoint
+        this.walrusUrl = "https://publisher.walrus.testnet.walrus.site/v1/store";
     }
 
     async storeOnWalrus(content: string): Promise<string> {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
 
             const response = await fetch(`${this.walrusUrl}?epochs=5`, {
                 method: "PUT",
@@ -33,16 +34,13 @@ export class AequiClient {
             if (!response.ok) throw new Error(`Walrus HTTP ${response.status}`);
             
             const data = await response.json();
-            
-            // Extracting per Walrus JSON schema: newlyCreated or alreadyCertified
-            const blobId = data.newlyCreated?.blobObject?.blobId || 
-                           data.alreadyCertified?.blobId;
+            const blobId = data.newlyCreated?.blobObject?.blobId || data.alreadyCertified?.blobId;
             
             if (!blobId) throw new Error("No blobId found");
-            console.log("Walrus Stored:", blobId);
             return blobId;
         } catch (e) {
             console.warn("Walrus unreachable. Using raw message fallback.");
+            // Returning content directly so the transaction doesn't break
             return content; 
         }
     }
@@ -65,13 +63,13 @@ export class AequiClient {
         const rawData = await zkRes.json();
         const proof = rawData.zkProof || rawData.result || rawData;
 
-        // 2. HA Build Logic
+        // 2. High Availability Build Logic
         let txBytes;
         let activeClient = this.client;
         try {
             txBytes = await tx.build({ client: this.client });
         } catch (e) {
-            console.warn("Primary Node Failed. Switching to Fallback Node...");
+            console.warn("Primary Node Fail (likely 401). Falling back...");
             txBytes = await tx.build({ client: this.fallbackClient });
             activeClient = this.fallbackClient;
         }
@@ -104,7 +102,7 @@ export class AequiClient {
         return await activeClient.executeTransactionBlock({
             transactionBlock: txBytes,
             signature: [zkLoginSig, sponsorData.signature],
-            options: { showEffects: true },
+            options: { showEffects: true, showEvents: true },
         });
     }
 }
