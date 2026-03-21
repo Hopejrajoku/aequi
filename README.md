@@ -85,8 +85,8 @@ This bypasses the ESM/CommonJS interop bugs present in the latest Node loaders.
 ## Roadmap
 - [x] **Phase 1:** Move Smart Contracts (Core Transfer)
 - [x] **Phase 2:** Gas Station / Sponsoring Module
-- [ ] **Phase 3:** zkLogin Integration (Auth Flow)
-- [ ] **Phase 4:** Aequi TypeScript SDK (Alpha)
+- [x] **Phase 3:** zkLogin Integration (Auth Flow)
+- [x] **Phase 4:** Aequi TypeScript SDK (Alpha)
 - [ ] **Phase 5:** MVP Demo App & Grant Submission
 
 ## Contributing
